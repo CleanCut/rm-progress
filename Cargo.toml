@@ -1,0 +1,32 @@
+[package]
+name = "rm-progress"
+version = "0.1.0"
+description = "rmp: a parallel rm that counts first, then deletes with a progress bar."
+edition = "2024"
+homepage = "https://github.com/CleanCut/rm-progress"
+repository = "https://github.com/CleanCut/rm-progress"
+readme = "README.md"
+keywords = ["rm", "delete", "parallel", "progress", "cli"]
+categories = ["command-line-utilities", "filesystem"]
+license = "MIT"
+exclude = ["/.github", "release.toml", "RELEASE.md", "rustfmt.toml", ".gitignore", ".editorconfig"]
+
+[[bin]]
+name = "rmp"
+path = "src/main.rs"
+
+[dependencies]
+console = { version = "0.16", default-features = false, features = ["std"] }
+indicatif = { version = "0.18", default-features = false }
+rayon = "1.12"
+signal-hook = { version = "0.4", default-features = false }
+
+[dev-dependencies]
+tempfile = "3.27"
+
+[lints.rust]
+unsafe_code = "forbid"
+
+[profile.release]
+lto = true
+codegen-units = 1
