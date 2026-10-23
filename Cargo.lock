@@ -181,6 +181,7 @@ version = "0.1.0"
 dependencies = [
  "console",
  "indicatif",
+ "libc",
  "objc2",
  "objc2-foundation",
  "rayon",

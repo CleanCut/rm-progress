@@ -20,7 +20,7 @@ Counted 50,100 files, 151 directories, 1.36 GiB (Free space 235.40 GiB -> ~236.7
 Deleted in 3.142 seconds
 ```
 
-On macOS, free space is what Finder reports as available, which includes purgeable space macOS can reclaim on demand. On Linux, it is the space available to users other than root. The free space after deleting is an estimate, from the disk blocks the counted files take up. It is too high when deleting frees less than that, as with a file that has another hard link, an APFS clone, or a Time Machine local snapshot. When the free space `rmp` finds afterward differs from the estimate, the `Deleted` line reports it.
+On macOS, free space is what Finder reports as available, which includes purgeable space macOS can reclaim on demand. On Linux, it is the space available to users other than root. The free space after deleting is an estimate of what deleting frees. A file with another hard link outside what you delete frees nothing, and on macOS neither does the part of a file that is shared with an APFS clone or kept by a snapshot, so `rmp` leaves those out. It cannot see blocks shared through reflinks on Linux filesystems such as Btrfs or XFS, so the estimate there can be too high. When the free space `rmp` finds afterward differs from the estimate, the `Deleted` line reports it.
 
 If any files or directories were left behind, a warning reports how many.
 

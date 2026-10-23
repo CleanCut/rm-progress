@@ -61,7 +61,7 @@ pub fn delete(targets: &[Target], tx: &Sender<Event>, interrupt: &Interrupt) {
                     let dir = Dir::new(target.path.clone(), None);
                     scope.spawn(move |scope| deleter.dir(scope, dir));
                 }
-                Kind::File { bytes, .. } => {
+                Kind::File { bytes } => {
                     scope.spawn(move |_| {
                         if !interrupt.is_raised() {
                             deleter.remove_file(&target.path, bytes);

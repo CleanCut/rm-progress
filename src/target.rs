@@ -6,8 +6,6 @@ use std::os::unix::ffi::OsStrExt;
 use std::os::unix::fs::MetadataExt;
 use std::path::{Path, PathBuf};
 
-use crate::count::disk;
-
 /// A path named on the command line, checked and ready to count and delete.
 #[derive(Debug)]
 pub struct Target {
@@ -23,8 +21,6 @@ pub enum Kind {
     /// Anything that is not a directory, including a symlink to one.
     File {
         bytes: u64,
-        /// Disk space the file takes up.
-        disk: u64,
     },
 }
 
@@ -61,11 +57,7 @@ impl Target {
         }
         let path = PathBuf::from(OsStr::from_bytes(trimmed));
         let metadata = fs::symlink_metadata(&path).map_err(TargetError::Io)?;
-        let kind = if metadata.is_dir() {
-            Kind::Dir
-        } else {
-            Kind::File { bytes: metadata.len(), disk: disk(&metadata) }
-        };
+        let kind = if metadata.is_dir() { Kind::Dir } else { Kind::File { bytes: metadata.len() } };
         Ok(Self { path, kind, dev: metadata.dev() })
     }
 }

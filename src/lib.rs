@@ -4,6 +4,8 @@
 //! their tallies over a channel to the calling thread, which sums them and draws the display.
 
 pub mod args;
+#[cfg(target_os = "macos")]
+mod clone;
 pub mod count;
 pub mod delete;
 pub mod interrupt;
@@ -22,7 +24,7 @@ use std::thread;
 use rayon::ThreadPoolBuilder;
 
 use args::{ArgsError, Command};
-use count::count;
+use count::{Freed, count};
 use delete::{Event, delete};
 use interrupt::Interrupt;
 use stats::Statistics;
@@ -113,18 +115,18 @@ fn count_all<'t>(targets: &'t [Target], interrupt: &Interrupt) -> (Statistics, V
         let disks: Vec<u64> = groups
             .iter()
             .map(|group| {
-                let mut disk = 0;
+                let mut freed = Freed::default();
                 drive(
                     |tx| count(group, &tx, interrupt),
                     |burst| {
                         for counted in burst {
                             total += counted.stats;
-                            disk += counted.disk;
+                            freed.add(counted.disk, counted.shared);
                         }
                         line.update(&total);
                     },
                 );
-                disk
+                freed.bytes()
             })
             .collect();
         let opened: Vec<_> = opening.join().unwrap_or_default();
@@ -199,14 +201,13 @@ fn signal_exit(signal: i32) -> ExitCode {
 #[cfg(test)]
 mod tests {
     use std::fs;
-    use std::os::unix::fs::{PermissionsExt, symlink};
+    use std::os::unix::fs::{MetadataExt, PermissionsExt, symlink};
     use std::path::Path;
 
     use signal_hook::consts::SIGINT;
     use tempfile::TempDir;
 
     use super::*;
-    use crate::count::Counted;
     use crate::delete::Action;
     use crate::target::Kind;
 
@@ -218,6 +219,21 @@ mod tests {
 
     fn link_bytes(path: &Path) -> u64 {
         fs::symlink_metadata(path).unwrap().len()
+    }
+
+    fn disk(path: &Path) -> u64 {
+        fs::symlink_metadata(path).unwrap().blocks() * 512
+    }
+
+    /// The totals of `targets` and the disk space deleting them frees.
+    fn count_freed(targets: &[Target], interrupt: &Interrupt) -> (Statistics, u64) {
+        let mut total = Statistics::default();
+        let mut freed = Freed::default();
+        for counted in collect(|tx| count(targets, &tx, interrupt)) {
+            total += counted.stats;
+            freed.add(counted.disk, counted.shared);
+        }
+        (total, freed.bytes())
     }
 
     #[test]
@@ -251,12 +267,28 @@ mod tests {
         assert!(matches!(targets[1].kind, Kind::File { .. }), "a symlink to a directory is a file");
 
         let interrupt = Interrupt::default();
-        let mut counted = Counted::default();
-        collect(|tx| count(&targets, &tx, &interrupt)).into_iter().for_each(|c| counted += c);
-        let total = counted.stats;
+        let (total, freed) = count_freed(&targets, &interrupt);
         let links = link_bytes(&doomed.join("link")) + link_bytes(&top_link);
         assert_eq!(total, Statistics { files: 12, dirs: 6, bytes: 5 + 6 + 1000 + 3 + links });
-        assert!(counted.disk > total.bytes, "small files take up whole blocks of disk");
+        assert!(freed > total.bytes, "small files take up whole blocks of disk");
+
+        fs::hard_link(doomed.join("a.txt"), doomed.join("twin")).unwrap();
+        fs::hard_link(keep.join("canary"), doomed.join("canary")).unwrap();
+        fs::write(keep.join("big"), vec![7; 64 * 1024]).unwrap();
+        fs::copy(keep.join("big"), doomed.join("copy")).unwrap();
+        fs::copy(doomed.join("sub/deep/b.bin"), doomed.join("sub/b2")).unwrap();
+        let (total, more) = count_freed(&targets, &interrupt);
+        let copies = if cfg!(target_os = "macos") {
+            0
+        } else {
+            disk(&doomed.join("copy")) + disk(&doomed.join("sub/b2"))
+        };
+        assert_eq!(
+            more,
+            freed + copies,
+            "an inode counts once, and only when all its links are counted, and on APFS a clone \
+             counts only when all its clones are"
+        );
 
         let stopped = Interrupt::default();
         stopped.raise(SIGINT);
