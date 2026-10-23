@@ -1,3 +1,4 @@
+use std::ffi::OsString;
 use std::fmt::Display;
 use std::path::Path;
 use std::time::Duration;
@@ -36,10 +37,20 @@ warning and carrying on with the rest. Ctrl-C stops it cleanly.
 Options:
   -h, --help     Print this help
   -V, --version  Print the version
+  -r, -f, -rf    Ignored, since rmp always deletes directories and never asks first
   --             Treat every argument after this one as a path
 ",
         version = env!("CARGO_PKG_VERSION")
     )
+}
+
+/// Warns, without color, that the `rm` options in `options` were ignored.
+pub fn ignored(options: &[OsString]) {
+    let options: Vec<_> = options.iter().map(|option| option.to_string_lossy()).collect();
+    eprintln!(
+        "warning: ignored {} (rmp always deletes directories and never asks first)",
+        options.join(" ")
+    );
 }
 
 pub fn warn(message: impl Display) {

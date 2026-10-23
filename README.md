@@ -54,6 +54,7 @@ Every argument is a path to delete. Files are deleted, directories are deleted r
 | --- | --- |
 | `-h`, `--help` | Print help |
 | `-V`, `--version` | Print the version |
+| `-r`, `-f`, `-rf` | Ignored with a warning, so `rm -rf` habits work: `rmp` always deletes directories and never asks first |
 | `--` | Treat every argument after this one as a path |
 
 To delete a path that starts with `-`, use `rmp -- -weird-name` or `rmp ./-weird-name`.

@@ -25,12 +25,14 @@ fn deletes_reports_warnings_and_prints_usage_without_color() {
     fs::set_permissions(&locked, fs::Permissions::from_mode(0o555)).unwrap();
     let missing = tmp.path().join("missing");
 
-    let run = rmp(&[doomed.as_os_str(), tmp.path().join("held").as_os_str(), missing.as_os_str()]);
+    let held = tmp.path().join("held");
+    let run = rmp(&["-rf".as_ref(), doomed.as_os_str(), held.as_os_str(), missing.as_os_str()]);
     fs::set_permissions(&locked, fs::Permissions::from_mode(0o755)).unwrap();
     let stderr = String::from_utf8_lossy(&run.stderr);
     assert_eq!(run.status.code(), Some(1), "a missing operand fails the run: {stderr}");
     assert!(!doomed.exists(), "the existing operand is still deleted");
     assert!(stderr.contains("warning: cannot remove"), "{stderr}");
+    assert!(stderr.starts_with("warning: ignored -rf ("), "rm's -rf is ignored: {stderr}");
     let size = if cfg!(target_os = "macos") { "2.05 kB" } else { "2.00 KiB" };
     let counted = format!("Counted 2 files, 4 directories, {size} (Free space ");
     assert!(stderr.contains(&counted), "the count ends with the free space: {stderr}");

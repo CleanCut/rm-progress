@@ -8,6 +8,7 @@
 - `rmp` reports the free space on each volume it deletes from, and the free space it expects once it finishes, and reports the free space afterward when it differs.
 - Ctrl-C, `SIGTERM`, `SIGHUP`, `SIGUSR1`, and `SIGUSR2` stop `rmp` cleanly.
 - `rmp` refuses to delete `.`, `..`, and `/`.
+- `-r`, `-f`, and `-rf` are accepted and ignored with a warning.
 
 <!-- next-url -->
 [Unreleased]: https://github.com/CleanCut/rm-progress/commits/main

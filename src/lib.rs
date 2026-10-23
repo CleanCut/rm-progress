@@ -46,7 +46,12 @@ pub fn run(args: impl IntoIterator<Item = OsString>) -> ExitCode {
             println!("rmp {}", env!("CARGO_PKG_VERSION"));
             return ExitCode::SUCCESS;
         }
-        Ok(Command::Remove(operands)) => operands,
+        Ok(Command::Remove { paths, ignored }) => {
+            if !ignored.is_empty() {
+                ui::ignored(&ignored);
+            }
+            paths
+        }
         Err(ArgsError::NoOperands) => {
             eprint!("{}", ui::usage());
             return ExitCode::from(2);
