@@ -31,14 +31,15 @@ fn deletes_reports_warnings_and_prints_usage_without_color() {
     assert_eq!(run.status.code(), Some(1), "a missing operand fails the run: {stderr}");
     assert!(!doomed.exists(), "the existing operand is still deleted");
     assert!(stderr.contains("warning: cannot remove"), "{stderr}");
-    let counted = "Counted 2 files, 4 directories, 2,048 bytes\nFree space: ";
-    assert!(stderr.contains(counted), "free space follows the count: {stderr}");
-    assert!(stderr.contains("Deleted 2.00 KiB in"), "{stderr}");
+    let counted = "Counted 2 files, 4 directories, 2.00 KiB (Free space ";
+    assert!(stderr.contains(counted), "the count ends with the free space: {stderr}");
+    assert!(stderr.contains(" -> ~"), "the free space afterward is an estimate: {stderr}");
+    let deleted = stderr.lines().find_map(|line| line.strip_prefix("Deleted in ")).unwrap();
+    let seconds = deleted.split_once(" seconds").unwrap().0;
+    assert_eq!(seconds.split_once('.').unwrap().1.len(), 3, "milliseconds: {stderr}");
     assert!(
-        stderr.contains(
-            "warning: deleted 1 file, 2 directories, but counted 2 files, 4 directories\n"
-        ),
-        "only the tallies that differ from the count are reported: {stderr}"
+        stderr.contains("warning: 1 file and 2 directories not deleted\n"),
+        "only the files and directories left behind are reported: {stderr}"
     );
     assert!(!stderr.contains('\x1b'), "no color or progress bar when stderr is not a terminal");
 }

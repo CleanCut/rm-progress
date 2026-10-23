@@ -10,6 +10,7 @@ pub mod interrupt;
 pub mod stats;
 pub mod target;
 mod ui;
+pub mod volume;
 
 use std::ffi::OsString;
 use std::iter;
@@ -27,6 +28,7 @@ use interrupt::Interrupt;
 use stats::Statistics;
 use target::Target;
 use ui::{CountLine, DeleteBar};
+use volume::Volume;
 
 /// Most worker threads a run uses. Deleting gets slower, not faster, with many more than this.
 const MAX_THREADS: usize = 6;
@@ -91,12 +93,7 @@ pub fn run(args: impl IntoIterator<Item = OsString>) -> ExitCode {
         ui::stopped(signal, " before anything was deleted");
         return signal_exit(signal);
     }
-    for &(target, disk) in &volumes {
-        if let Ok(free) = target.free_space() {
-            ui::free_space(free, disk, (volumes.len() > 1).then_some(target.path.as_path()));
-        }
-    }
-    failed |= delete_all(&targets, total, &interrupt) > 0;
+    failed |= delete_all(&targets, total, &volumes, &interrupt) > 0;
     if let Some(signal) = interrupt.signal() {
         ui::stopped(signal, "");
         return signal_exit(signal);
@@ -104,19 +101,16 @@ pub fn run(args: impl IntoIterator<Item = OsString>) -> ExitCode {
     if failed { ExitCode::FAILURE } else { ExitCode::SUCCESS }
 }
 
-/// Counts `targets`, sorted by filesystem, behind a live counter line. Returns the totals and, for
-/// each filesystem, one of its targets and the disk space its targets take up there.
-fn count_all<'t>(
-    targets: &'t [Target],
-    interrupt: &Interrupt,
-) -> (Statistics, Vec<(&'t Target, u64)>) {
+/// Counts `targets`, sorted by filesystem, behind a live counter line. Returns the totals and,
+/// unless `interrupt` is raised, each filesystem whose free space can be read.
+fn count_all<'t>(targets: &'t [Target], interrupt: &Interrupt) -> (Statistics, Vec<Volume<'t>>) {
     let line = CountLine::new();
     let mut total = Statistics::default();
     let mut volumes = Vec::new();
-    for volume in targets.chunk_by(|a, b| a.dev == b.dev) {
+    for group in targets.chunk_by(|a, b| a.dev == b.dev) {
         let mut disk = 0;
         drive(
-            |tx| count(volume, &tx, interrupt),
+            |tx| count(group, &tx, interrupt),
             |burst| {
                 for counted in burst {
                     total += counted.stats;
@@ -125,14 +119,22 @@ fn count_all<'t>(
                 line.update(&total);
             },
         );
-        volumes.push((&volume[0], disk));
+        volumes.extend(Volume::open(&group[0], disk).ok());
     }
-    line.finish(&total);
+    if interrupt.is_raised() {
+        volumes.clear();
+    }
+    line.finish(&total, &volumes);
     (total, volumes)
 }
 
 /// Deletes `targets` behind a progress bar toward `total`, returning how many failures occurred.
-fn delete_all(targets: &[Target], total: Statistics, interrupt: &Interrupt) -> u64 {
+fn delete_all(
+    targets: &[Target],
+    total: Statistics,
+    volumes: &[Volume],
+    interrupt: &Interrupt,
+) -> u64 {
     let bar = DeleteBar::new(total);
     let mut done = Statistics::default();
     let mut failures = 0;
@@ -151,7 +153,9 @@ fn delete_all(targets: &[Target], total: Statistics, interrupt: &Interrupt) -> u
             bar.update(&done);
         },
     );
-    bar.finish(&done, failures);
+    let after: Vec<_> =
+        volumes.iter().filter_map(|volume| Some((volume, volume.free_space().ok()?))).collect();
+    bar.finish(&done, &after, failures);
     failures
 }
 

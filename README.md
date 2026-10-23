@@ -9,22 +9,20 @@
 
 ```text
 $ rmp target node_modules
-Counted 50,100 files, 151 directories, 1,463,091,200 bytes
-Free space: 235.40 GiB -> 236.76 GiB
+Counted 50,100 files, 151 directories, 1.36 GiB (Free space 235.40 GiB -> ~236.76 GiB)
 ██████████████████████████░░░░░░░░░░░░░ 897.50 MiB/1.36 GiB (1s left) 33,299/50,251 entries
 ```
 
-...and when it finishes, the bar is replaced by the totals:
+...and when it finishes, the bar is replaced by the time it took:
 
 ```text
-Counted 50,100 files, 151 directories, 1,463,091,200 bytes
-Free space: 235.40 GiB -> 236.76 GiB
-Deleted 1.36 GiB in 3 seconds
+Counted 50,100 files, 151 directories, 1.36 GiB (Free space 235.40 GiB -> ~236.76 GiB)
+Deleted in 3.142 seconds
 ```
 
-The free space after deleting is a prediction, from the disk blocks the counted files take up. It is too high when deleting frees less than that, as with a file that has another hard link, an APFS clone, or a Time Machine local snapshot.
+The free space after deleting is an estimate, from the disk blocks the counted files take up. It is too high when deleting frees less than that, as with a file that has another hard link, an APFS clone, or a Time Machine local snapshot. When the free space `rmp` finds afterward differs from the estimate, the `Deleted` line reports it.
 
-If anything was left behind, or the files changed while `rmp` was deleting them, a warning reports each count that differs from what was counted.
+If any files or directories were left behind, a warning reports how many.
 
 ## Features
 
@@ -32,7 +30,7 @@ If anything was left behind, or the files changed while `rmp` was deleting them,
 - **Informative** - A live counter of files, directories, and bytes while counting, then a progress bar measured in bytes (KiB, MiB, GiB, ...) with a countdown estimate while deleting. Before deleting, it shows the free space now and the free space you'll have afterward.
 - **Persistent** - A failure is reported as a warning, and `rmp` keeps going and deletes everything else it can.
 - **Careful** - Symlinks are deleted, never followed. `rmp` refuses to delete `.`, `..`, or `/`.
-- **Interruptible** - Ctrl-C, `SIGTERM`, `SIGHUP`, `SIGUSR1`, and `SIGUSR2` all stop `rmp` quickly and cleanly, reporting what was deleted so far.
+- **Interruptible** - Ctrl-C, `SIGTERM`, `SIGHUP`, `SIGUSR1`, and `SIGUSR2` all stop `rmp` quickly and cleanly, reporting how many files and directories were left.
 - **Colorful** - Colors when writing to a terminal, plain text when not. `NO_COLOR` and `CLICOLOR_FORCE` are honored.
 - **Portable** - Linux and macOS.
 

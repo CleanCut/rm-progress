@@ -6,8 +6,6 @@ use std::os::unix::ffi::OsStrExt;
 use std::os::unix::fs::MetadataExt;
 use std::path::{Path, PathBuf};
 
-use rustix::fs::statvfs;
-
 use crate::count::disk;
 
 /// A path named on the command line, checked and ready to count and delete.
@@ -69,19 +67,6 @@ impl Target {
             Kind::File { bytes: metadata.len(), disk: disk(&metadata) }
         };
         Ok(Self { path, kind, dev: metadata.dev() })
-    }
-
-    /// Bytes free for unprivileged use on the filesystem the target is on.
-    pub fn free_space(&self) -> io::Result<u64> {
-        let on = match self.kind {
-            Kind::Dir => &self.path,
-            Kind::File { .. } => match self.path.parent() {
-                Some(parent) if !parent.as_os_str().is_empty() => parent,
-                _ => Path::new("."),
-            },
-        };
-        let stats = statvfs(on)?;
-        Ok(stats.f_bavail * stats.f_frsize)
     }
 }
 
