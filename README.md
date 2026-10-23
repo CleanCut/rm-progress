@@ -32,7 +32,7 @@ If any files or directories were left behind, a warning reports how many.
 - **Careful** - Symlinks are deleted, never followed. `rmp` refuses to delete `.`, `..`, or `/`.
 - **Interruptible** - Ctrl-C, `SIGTERM`, `SIGHUP`, `SIGUSR1`, and `SIGUSR2` all stop `rmp` quickly and cleanly, reporting how many files and directories were left.
 - **Colorful** - Colors when writing to a terminal, plain text when not. `NO_COLOR` and `CLICOLOR_FORCE` are honored.
-- **Portable** - Linux and macOS.
+- **Portable** - Linux and macOS. Building on any other system stops with an error saying so.
 
 ## Install
 

@@ -3,6 +3,8 @@
 //! A run counts every target on the rayon pool, then deletes them on the same pool. Workers send
 //! their tallies over a channel to the calling thread, which sums them and draws the display.
 
+#![cfg(unix)]
+
 pub mod args;
 #[cfg(target_os = "macos")]
 mod clone;
