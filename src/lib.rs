@@ -101,26 +101,43 @@ pub fn run(args: impl IntoIterator<Item = OsString>) -> ExitCode {
     if failed { ExitCode::FAILURE } else { ExitCode::SUCCESS }
 }
 
-/// Counts `targets`, sorted by filesystem, behind a live counter line. Returns the totals and,
-/// unless `interrupt` is raised, each filesystem whose free space can be read.
+/// Counts `targets`, sorted by filesystem, behind a live counter line, reading each filesystem's
+/// free space on another thread meanwhile. Returns the totals and, unless `interrupt` is raised,
+/// each filesystem whose free space can be read.
 fn count_all<'t>(targets: &'t [Target], interrupt: &Interrupt) -> (Statistics, Vec<Volume<'t>>) {
+    let groups: Vec<&[Target]> = targets.chunk_by(|a, b| a.dev == b.dev).collect();
     let line = CountLine::new();
     let mut total = Statistics::default();
-    let mut volumes = Vec::new();
-    for group in targets.chunk_by(|a, b| a.dev == b.dev) {
-        let mut disk = 0;
-        drive(
-            |tx| count(group, &tx, interrupt),
-            |burst| {
-                for counted in burst {
-                    total += counted.stats;
-                    disk += counted.disk;
-                }
-                line.update(&total);
-            },
-        );
-        volumes.extend(Volume::open(&group[0], disk).ok());
-    }
+    let mut volumes = thread::scope(|scope| {
+        let opening = scope.spawn(|| groups.iter().map(|group| Volume::open(&group[0])).collect());
+        let disks: Vec<u64> = groups
+            .iter()
+            .map(|group| {
+                let mut disk = 0;
+                drive(
+                    |tx| count(group, &tx, interrupt),
+                    |burst| {
+                        for counted in burst {
+                            total += counted.stats;
+                            disk += counted.disk;
+                        }
+                        line.update(&total);
+                    },
+                );
+                disk
+            })
+            .collect();
+        let opened: Vec<_> = opening.join().unwrap_or_default();
+        opened
+            .into_iter()
+            .zip(disks)
+            .filter_map(|(volume, disk)| {
+                let mut volume = volume.ok()?;
+                volume.expected += disk;
+                Some(volume)
+            })
+            .collect::<Vec<_>>()
+    });
     if interrupt.is_raised() {
         volumes.clear();
     }

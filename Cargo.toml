@@ -22,6 +22,18 @@ rayon = "1.12"
 rustix = { version = "1.1", default-features = false, features = ["fs", "std"] }
 signal-hook = { version = "0.4", default-features = false }
 
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "0.6"
+objc2-foundation = { version = "0.3", default-features = false, features = [
+  "std",
+  "NSArray",
+  "NSDictionary",
+  "NSError",
+  "NSString",
+  "NSURL",
+  "NSValue",
+] }
+
 [dev-dependencies]
 tempfile = "3.27"
 
