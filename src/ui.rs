@@ -3,13 +3,23 @@ use std::path::Path;
 use std::time::Duration;
 
 use console::style;
-use indicatif::{HumanBytes, HumanCount, ProgressBar, ProgressStyle};
+#[cfg(not(target_os = "macos"))]
+use indicatif::BinaryBytes as Bytes;
+#[cfg(target_os = "macos")]
+use indicatif::DecimalBytes as Bytes;
+use indicatif::{HumanCount, ProgressBar, ProgressStyle};
 
 use crate::interrupt;
 use crate::stats::Statistics;
 use crate::volume::Volume;
 
 const TICK: Duration = Duration::from_millis(100);
+
+/// The progress bar, with sizes in Finder's decimal units on macOS and in binary units elsewhere.
+#[cfg(target_os = "macos")]
+const BAR: &str = "{wide_bar:.red/white} {decimal_bytes}/{decimal_total_bytes} ({eta} left) {msg}";
+#[cfg(not(target_os = "macos"))]
+const BAR: &str = "{wide_bar:.red/white} {binary_bytes}/{binary_total_bytes} ({eta} left) {msg}";
 
 pub fn usage() -> String {
     format!(
@@ -71,8 +81,7 @@ impl CountLine {
         self.0.finish_and_clear();
         let free = free_space(
             volumes.iter().map(|volume| {
-                let change =
-                    format!("{} -> ~{}", HumanBytes(volume.before), HumanBytes(volume.expected));
+                let change = format!("{} -> ~{}", Bytes(volume.before), Bytes(volume.expected));
                 (volume.target.path.as_path(), change)
             }),
             volumes.len() > 1,
@@ -87,7 +96,7 @@ fn summary(stats: &Statistics) -> String {
         "{}, {}, {}",
         tally(stats.files, "file", "files"),
         tally(stats.dirs, "directory", "directories"),
-        HumanBytes(stats.bytes)
+        Bytes(stats.bytes)
     )
 }
 
@@ -116,10 +125,7 @@ pub struct DeleteBar {
 
 impl DeleteBar {
     pub fn new(total: Statistics) -> Self {
-        let style = ProgressStyle::with_template(
-            "{wide_bar:.red/white} {binary_bytes}/{binary_total_bytes} ({eta} left) {msg}",
-        )
-        .expect("the progress bar template is valid");
+        let style = ProgressStyle::with_template(BAR).expect("the progress bar template is valid");
         let bar = ProgressBar::new(total.bytes).with_style(style);
         bar.enable_steady_tick(TICK);
         Self { bar, total }
@@ -146,8 +152,8 @@ impl DeleteBar {
         self.bar.finish_and_clear();
         let free = free_space(
             after.iter().filter_map(|&(volume, free)| {
-                let shown = HumanBytes(free).to_string();
-                let differs = shown != HumanBytes(volume.expected).to_string();
+                let shown = Bytes(free).to_string();
+                let differs = shown != Bytes(volume.expected).to_string();
                 differs.then_some((volume.target.path.as_path(), shown))
             }),
             after.len() > 1,

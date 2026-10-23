@@ -31,8 +31,9 @@ fn deletes_reports_warnings_and_prints_usage_without_color() {
     assert_eq!(run.status.code(), Some(1), "a missing operand fails the run: {stderr}");
     assert!(!doomed.exists(), "the existing operand is still deleted");
     assert!(stderr.contains("warning: cannot remove"), "{stderr}");
-    let counted = "Counted 2 files, 4 directories, 2.00 KiB (Free space ";
-    assert!(stderr.contains(counted), "the count ends with the free space: {stderr}");
+    let size = if cfg!(target_os = "macos") { "2.05 kB" } else { "2.00 KiB" };
+    let counted = format!("Counted 2 files, 4 directories, {size} (Free space ");
+    assert!(stderr.contains(&counted), "the count ends with the free space: {stderr}");
     assert!(stderr.contains(" -> ~"), "the free space afterward is an estimate: {stderr}");
     let deleted = stderr.lines().find_map(|line| line.strip_prefix("Deleted in ")).unwrap();
     let seconds = deleted.split_once(" seconds").unwrap().0;
