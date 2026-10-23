@@ -70,7 +70,7 @@ pub fn run(args: impl IntoIterator<Item = OsString>) -> ExitCode {
     }
 
     let mut failed = false;
-    let targets: Vec<Target> = operands
+    let mut targets: Vec<Target> = operands
         .iter()
         .filter_map(|operand| {
             Target::new(operand)
@@ -84,11 +84,17 @@ pub fn run(args: impl IntoIterator<Item = OsString>) -> ExitCode {
     if targets.is_empty() {
         return ExitCode::FAILURE;
     }
+    targets.sort_by_key(|target| target.dev);
 
-    let total = count_all(&targets, &interrupt);
+    let (total, volumes) = count_all(&targets, &interrupt);
     if let Some(signal) = interrupt.signal() {
         ui::stopped(signal, " before anything was deleted");
         return signal_exit(signal);
+    }
+    for &(target, disk) in &volumes {
+        if let Ok(free) = target.free_space() {
+            ui::free_space(free, disk, (volumes.len() > 1).then_some(target.path.as_path()));
+        }
     }
     failed |= delete_all(&targets, total, &interrupt) > 0;
     if let Some(signal) = interrupt.signal() {
@@ -98,19 +104,31 @@ pub fn run(args: impl IntoIterator<Item = OsString>) -> ExitCode {
     if failed { ExitCode::FAILURE } else { ExitCode::SUCCESS }
 }
 
-/// Counts `targets` behind a live counter line, returning the totals.
-fn count_all(targets: &[Target], interrupt: &Interrupt) -> Statistics {
+/// Counts `targets`, sorted by filesystem, behind a live counter line. Returns the totals and, for
+/// each filesystem, one of its targets and the disk space its targets take up there.
+fn count_all<'t>(
+    targets: &'t [Target],
+    interrupt: &Interrupt,
+) -> (Statistics, Vec<(&'t Target, u64)>) {
     let line = CountLine::new();
     let mut total = Statistics::default();
-    drive(
-        |tx| count(targets, &tx, interrupt),
-        |burst| {
-            burst.for_each(|stats| total += stats);
-            line.update(&total);
-        },
-    );
+    let mut volumes = Vec::new();
+    for volume in targets.chunk_by(|a, b| a.dev == b.dev) {
+        let mut disk = 0;
+        drive(
+            |tx| count(volume, &tx, interrupt),
+            |burst| {
+                for counted in burst {
+                    total += counted.stats;
+                    disk += counted.disk;
+                }
+                line.update(&total);
+            },
+        );
+        volumes.push((&volume[0], disk));
+    }
     line.finish(&total);
-    total
+    (total, volumes)
 }
 
 /// Deletes `targets` behind a progress bar toward `total`, returning how many failures occurred.
@@ -167,6 +185,7 @@ mod tests {
     use tempfile::TempDir;
 
     use super::*;
+    use crate::count::Counted;
     use crate::delete::Action;
     use crate::target::Kind;
 
@@ -211,10 +230,12 @@ mod tests {
         assert!(matches!(targets[1].kind, Kind::File { .. }), "a symlink to a directory is a file");
 
         let interrupt = Interrupt::default();
-        let mut total = Statistics::default();
-        collect(|tx| count(&targets, &tx, &interrupt)).into_iter().for_each(|s| total += s);
+        let mut counted = Counted::default();
+        collect(|tx| count(&targets, &tx, &interrupt)).into_iter().for_each(|c| counted += c);
+        let total = counted.stats;
         let links = link_bytes(&doomed.join("link")) + link_bytes(&top_link);
         assert_eq!(total, Statistics { files: 12, dirs: 6, bytes: 5 + 6 + 1000 + 3 + links });
+        assert!(counted.disk > total.bytes, "small files take up whole blocks of disk");
 
         let stopped = Interrupt::default();
         stopped.raise(SIGINT);

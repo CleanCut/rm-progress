@@ -157,6 +157,7 @@ dependencies = [
  "console",
  "indicatif",
  "rayon",
+ "rustix",
  "signal-hook",
  "tempfile",
 ]

@@ -19,6 +19,7 @@ path = "src/main.rs"
 console = { version = "0.16", default-features = false, features = ["std"] }
 indicatif = { version = "0.18", default-features = false }
 rayon = "1.12"
+rustix = { version = "1.1", default-features = false, features = ["fs", "std"] }
 signal-hook = { version = "0.4", default-features = false }
 
 [dev-dependencies]

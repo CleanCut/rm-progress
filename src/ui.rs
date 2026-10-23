@@ -1,4 +1,5 @@
 use std::fmt::Display;
+use std::path::Path;
 use std::time::Duration;
 
 use console::style;
@@ -45,6 +46,14 @@ pub fn stopped(signal: i32, detail: &str) {
         style("Stopped").yellow().bold().for_stderr(),
         interrupt::name(signal)
     );
+}
+
+/// Reports `free` bytes of free space and what it becomes once `freed` more bytes are freed,
+/// followed by the target `on` the filesystem when one is given.
+pub fn free_space(free: u64, freed: u64, on: Option<&Path>) {
+    let on =
+        on.map_or(String::new(), |path| format!(" on the volume holding '{}'", path.display()));
+    eprintln!("Free space: {} -> {}{on}", HumanBytes(free), HumanBytes(free + freed));
 }
 
 /// The live counter line shown while counting.

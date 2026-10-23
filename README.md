@@ -10,6 +10,7 @@
 ```text
 $ rmp target node_modules
 Counted 50,100 files, 151 directories, 1,463,091,200 bytes
+Free space: 235.40 GiB -> 236.76 GiB
 ██████████████████████████░░░░░░░░░░░░░ 897.50 MiB/1.36 GiB (1s left) 33,299/50,251 entries
 ```
 
@@ -17,15 +18,18 @@ Counted 50,100 files, 151 directories, 1,463,091,200 bytes
 
 ```text
 Counted 50,100 files, 151 directories, 1,463,091,200 bytes
+Free space: 235.40 GiB -> 236.76 GiB
 Deleted 1.36 GiB in 3 seconds
 ```
+
+The free space after deleting is a prediction, from the disk blocks the counted files take up. It is too high when deleting frees less than that, as with a file that has another hard link, an APFS clone, or a Time Machine local snapshot.
 
 If anything was left behind, or the files changed while `rmp` was deleting them, a warning reports each count that differs from what was counted.
 
 ## Features
 
 - **Fast** - Counting and deleting both run on up to 6 threads via [Rayon], which deletes faster than `rm -rf` (see [Performance](#performance)).
-- **Informative** - A live counter of files, directories, and bytes while counting, then a progress bar measured in bytes (KiB, MiB, GiB, ...) with a countdown estimate while deleting.
+- **Informative** - A live counter of files, directories, and bytes while counting, then a progress bar measured in bytes (KiB, MiB, GiB, ...) with a countdown estimate while deleting. Before deleting, it shows the free space now and the free space you'll have afterward.
 - **Persistent** - A failure is reported as a warning, and `rmp` keeps going and deletes everything else it can.
 - **Careful** - Symlinks are deleted, never followed. `rmp` refuses to delete `.`, `..`, or `/`.
 - **Interruptible** - Ctrl-C, `SIGTERM`, `SIGHUP`, `SIGUSR1`, and `SIGUSR2` all stop `rmp` quickly and cleanly, reporting what was deleted so far.

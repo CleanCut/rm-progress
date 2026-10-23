@@ -31,7 +31,8 @@ fn deletes_reports_warnings_and_prints_usage_without_color() {
     assert_eq!(run.status.code(), Some(1), "a missing operand fails the run: {stderr}");
     assert!(!doomed.exists(), "the existing operand is still deleted");
     assert!(stderr.contains("warning: cannot remove"), "{stderr}");
-    assert!(stderr.contains("Counted 2 files, 4 directories, 2,048 bytes"), "{stderr}");
+    let counted = "Counted 2 files, 4 directories, 2,048 bytes\nFree space: ";
+    assert!(stderr.contains(counted), "free space follows the count: {stderr}");
     assert!(stderr.contains("Deleted 2.00 KiB in"), "{stderr}");
     assert!(
         stderr.contains(
